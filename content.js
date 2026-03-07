@@ -43,13 +43,17 @@
                     clearInterval(poller);
                     inputEl.focus();
                     try {
-                        const promptText = await navigator.clipboard.readText();
-                        if (promptText) {
-                            document.execCommand('insertText', false, promptText);
-                            setTimeout(() => {
-                                inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-                            }, 600);
-                        }
+                        // Priority: Read from Storage (to bypass Clipboard user-activation issues)
+                        chrome.storage.local.get(['pendingPrompt'], (result) => {
+                            const promptText = result.pendingPrompt;
+                            if (promptText) {
+                                document.execCommand('insertText', false, promptText);
+                                chrome.storage.local.remove('pendingPrompt'); // Clean up
+                                setTimeout(() => {
+                                    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+                                }, 600);
+                            }
+                        });
                     } catch (e) { }
                 }
             }, 500);
@@ -72,9 +76,7 @@
     function pauseVideo() {
         try {
             const v = document.querySelector('video');
-            if (v && !v.paused) {
-                v.pause();
-            }
+            if (v && !v.paused) v.pause();
         } catch (e) { }
     }
 
@@ -86,7 +88,7 @@
 
         try {
             const resp = await fetch(url, options);
-            if (resp.status === 412) throw new Error('B站 412 风控 (请稍后再试或检查登录状态)');
+            if (resp.status === 412) throw new Error('触发了 B 站 412 风控，请刷新后再试');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
             const text = await resp.text();
@@ -96,7 +98,7 @@
                     await new Promise(r => setTimeout(r, 1500));
                     return safeFetch(url, options, retry + 1);
                 }
-                throw new Error('接口响应异常 (返回了 HTML 引导页)');
+                throw new Error('接口响应异常');
             }
         } catch (err) {
             if (retry < 1 && !err.message.includes('412')) {
@@ -152,7 +154,23 @@
     if (document.body) inject();
     else document.addEventListener('DOMContentLoaded', inject);
 
-    // ========== 2. Subtitle Extraction Logic (Robust) ==========
+    async function finalizeExtraction(text, hash) {
+        // 1. Save to storage (most reliable for Bridge)
+        await chrome.storage.local.set({ pendingPrompt: text });
+
+        // 2. Best-effort clipboard copy
+        try { await navigator.clipboard.writeText(text); } catch (e) { }
+
+        showToast('✅ 提取成功，正在直通 Gemini...');
+
+        // 3. Use Background Script to open tab (bypasses activation requirement)
+        chrome.runtime.sendMessage({
+            type: 'OPEN_GEMINI',
+            url: 'https://gemini.google.com/app' + hash
+        });
+    }
+
+    // ========== 2. Subtitle Extraction Logic ==========
     async function extractSubtitle() {
         pauseVideo();
         showToast('🔍 正在提取字幕...');
@@ -168,45 +186,34 @@
                         if (m) playerResponse = JSON.parse(m[1]);
                     }
                 }
-                if (!playerResponse) throw new Error('无法解析视频播放器数据');
+                if (!playerResponse) throw new Error('无法解析播放器数据');
                 const captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-                if (!captions) throw new Error('该视频无字幕轨道');
+                if (!captions) throw new Error('视频无字幕');
                 const track = captions.find(t => t.languageCode.startsWith('zh')) || captions[0];
                 const subJson = await (await fetch(track.baseUrl + '&fmt=json3')).json();
                 textMarkup = subJson.events.filter(e => e.segs).map(e => e.segs.map(s => s.utf8).join('')).join('\n');
             } else {
-                // Bilibili 字幕 (Robust ID detection)
                 const pathSearchs = {};
                 location.search.slice(1).replace(/([^=&]*)=([^=&]*)/g, (_, a, b) => pathSearchs[a] = b);
-
-                let id = pathSearchs.bvid;
-                if (!id) {
-                    const paths = location.pathname.split('/');
-                    id = paths.find(p => p.startsWith('BV')) || paths[paths.length - 1];
-                }
+                let id = pathSearchs.bvid || location.pathname.split('/').find(p => p.startsWith('BV'));
                 if (!id) throw new Error('无法提取视频 ID');
 
                 const viewJson = await safeFetch(`https://api.bilibili.com/x/web-interface/view?bvid=${id}`);
-                if (viewJson.code !== 0) throw new Error(viewJson.message);
                 const { aid, cid } = viewJson.data;
                 const playerJson = await safeFetch(`https://api.bilibili.com/x/player/wbi/v2?aid=${aid}&cid=${cid}`);
                 const subtitles = playerJson.data?.subtitle?.subtitles;
                 if (!subtitles || !subtitles.length) throw new Error('视频无可用字幕');
 
                 const sub = subtitles.find(s => s.lan.startsWith('zh')) || subtitles[0];
-                let subUrl = sub.subtitle_url;
+                let subUrl = sub.subtitle_url.replace('http:', 'https:');
                 if (subUrl.startsWith('//')) subUrl = 'https:' + subUrl;
-                else subUrl = subUrl.replace('http:', 'https:');
 
-                // 重要：获取字幕 JSON 通常不需要 credentials，除非是私有 CDN
                 const subData = await safeFetch(subUrl, { credentials: 'omit' });
                 textMarkup = subData.body.map(i => i.content).join('\n');
             }
 
             const finalPrompt = textMarkup + '\n\n' + config.subtitlePrompt;
-            await navigator.clipboard.writeText(finalPrompt);
-            showToast('✅ 字幕已复制，跳转中...');
-            setTimeout(() => window.open('https://gemini.google.com/app#stg-auto', '_blank'), 600);
+            await finalizeExtraction(finalPrompt, '#stg-auto');
         } catch (e) {
             showToast('❌ 字幕提取失败: ' + e.message);
         }
@@ -215,7 +222,7 @@
     // ========== 3. Comment Extraction Logic ==========
     async function extractComments() {
         pauseVideo();
-        showToast('🚀 正在提取评论 (目标 ~1000 条)...');
+        showToast('🚀 正在提取评论...');
 
         try {
             const bvid = location.pathname.match(/(BV[a-zA-Z0-9]+)/i)?.[1];
@@ -251,7 +258,7 @@
             }
 
             results.sort((a, b) => b.like - a.like);
-            let doc = `Bilibili 评论提取 (约 ${results.length} 组)\n\n`;
+            let doc = `Bilibili 评论提取 (约 ${results.length} 组热评)\n\n`;
             let finalCount = 0;
             for (const c of results) {
                 if (finalCount >= 550) break;
@@ -267,9 +274,7 @@
             }
             doc += '\n' + config.commentPrompt;
 
-            await navigator.clipboard.writeText(doc);
-            showToast('✅ 评论已复制，跳转中...');
-            setTimeout(() => window.open('https://gemini.google.com/app#bce-auto', '_blank'), 600);
+            await finalizeExtraction(doc, '#bce-auto');
         } catch (e) {
             showToast('❌ 评论提取失败: ' + e.message);
         }
