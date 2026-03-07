@@ -1,0 +1,78 @@
+/* Bili-Q-TLDR Pro - Merged Styles */
+#bili-suite-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    z-index: 999999;
+    position: fixed;
+    right: 20px;
+    bottom: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.bs-fab-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.bs-fab-btn:hover {
+    transform: scale(1.1);
+}
+
+.bs-fab-btn:disabled {
+    background: #ccc !important;
+    cursor: wait;
+}
+
+.bs-sub-btn {
+    background: linear-gradient(135deg, #4285f4 0%, #8b5cf6 100%);
+}
+
+.bs-comm-btn {
+    background: #fb7299;
+}
+
+.bs-fab-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+#bs-toast {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    font-size: 13px;
+    font-weight: 500;
+    color: #fb7299;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+    #bs-toast {
+        background: rgba(30, 30, 30, 0.95);
+        color: #fc8bab;
+    }
+}
+
+#bs-toast.bs-show {
+    opacity: 1;
+    transform: translateY(0);
+}

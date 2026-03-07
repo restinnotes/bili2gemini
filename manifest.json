@@ -1,0 +1,47 @@
+{
+    "manifest_version": 3,
+    "name": "Bili-Q-TLDR Pro",
+    "version": "1.0.0",
+    "description": "Bilibili/YouTube 提炼助手：一键提取字幕或精华评论并由 Gemini 总结。",
+    "permissions": [
+        "activeTab",
+        "storage",
+        "clipboardRead"
+    ],
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": true
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.youtube.com/watch*",
+                "https://www.bilibili.com/video/*",
+                "https://bilibili.com/video/*",
+                "https://gemini.google.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "style.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "icons": {
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "bili-q-tldr-pro@zuoyi.custom",
+            "strict_min_version": "109.0",
+            "data_collection_permissions": {
+                "required": [
+                    "none"
+                ]
+            }
+        }
+    }
+}
