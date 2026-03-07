@@ -222,7 +222,12 @@
                 const subtitles = playerJson.data?.subtitle?.subtitles;
                 if (!subtitles || !subtitles.length) throw new Error('视频无可用字幕');
 
-                const sub = subtitles.find(s => s.lan.startsWith('zh')) || subtitles[0];
+                // 强化匹配逻辑：优先繁简中文 (包含原生与 AI 生成)，其次英文，最后兜底
+                const sub = subtitles.find(s => {
+                    const l = s.lan.toLowerCase();
+                    return l.includes('zh') || l.includes('hans') || l.includes('cn');
+                }) || subtitles.find(s => s.lan.toLowerCase().includes('en')) || subtitles[0];
+
                 let subUrl = sub.subtitle_url.replace('http:', 'https:');
                 if (subUrl.startsWith('//')) subUrl = 'https:' + subUrl;
 
