@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Bili2Gemini 视频提炼助手",
-    "version": "1.0.0",
+    "version": "1.1",
     "description": "一键将 Bilibili/YouTube 视频的字幕与评论区精华提取，并无缝直通 Gemini 进行 AI 总结提炼。",
     "short_name": "Bili2Gemini",
     "permissions": [
@@ -43,7 +43,7 @@
     },
     "browser_specific_settings": {
         "gecko": {
-            "id": "bili2gemini@zuoyi.custom",
+            "id": "bili-q-tldr-pro@zuoyi.custom",
             "strict_min_version": "109.0"
         }
     }
