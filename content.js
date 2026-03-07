@@ -114,13 +114,20 @@
         return str.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '').replace(/\s+/g, ' ').trim();
     }
 
-    // ========== UI Injection ==========
-    const isVideoPage = (PLATFORM === 'youtube' && location.pathname.startsWith('/watch')) ||
-        (PLATFORM === 'bilibili' && (location.pathname.includes('/video/') || location.pathname.includes('/watchlater/')));
+    // ========== UI Injection & SPA Handling ==========
+    function checkAndInject() {
+        const isVideoPage = (PLATFORM === 'youtube' && location.pathname.startsWith('/watch')) ||
+            (PLATFORM === 'bilibili' && (location.pathname.includes('/video/') || location.pathname.includes('/watchlater/')));
 
-    if (!isVideoPage) return;
+        if (isVideoPage) {
+            injectButtons();
+        } else {
+            const existing = document.getElementById('bili-suite-container');
+            if (existing) existing.remove();
+        }
+    }
 
-    const inject = () => {
+    const injectButtons = () => {
         if (document.getElementById('bili-suite-container')) return;
         const container = document.createElement('div');
         container.id = 'bili-suite-container';
@@ -137,22 +144,29 @@
     `;
         document.body.appendChild(container);
 
-        const subBtn = container.querySelector('.bs-sub-btn');
-        const commBtn = container.querySelector('.bs-comm-btn');
-
-        subBtn.addEventListener('click', () => {
-            subBtn.disabled = true;
-            extractSubtitle().finally(() => subBtn.disabled = false);
+        container.querySelector('.bs-sub-btn').addEventListener('click', function () {
+            this.disabled = true;
+            extractSubtitle().finally(() => this.disabled = false);
         });
 
-        commBtn.addEventListener('click', () => {
-            commBtn.disabled = true;
-            extractComments().finally(() => commBtn.disabled = false);
+        container.querySelector('.bs-comm-btn').addEventListener('click', function () {
+            this.disabled = true;
+            extractComments().finally(() => this.disabled = false);
         });
     };
 
-    if (document.body) inject();
-    else document.addEventListener('DOMContentLoaded', inject);
+    // Watch for URL changes (SPA)
+    let lastUrl = location.href;
+    setInterval(() => {
+        if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            checkAndInject();
+        }
+    }, 1000);
+
+    // Initial check
+    if (document.body) checkAndInject();
+    else document.addEventListener('DOMContentLoaded', checkAndInject);
 
     async function finalizeExtraction(text, hash) {
         // 1. Save to storage (most reliable for Bridge)
@@ -178,21 +192,49 @@
         try {
             let textMarkup = '';
             if (PLATFORM === 'youtube') {
-                const scripts = document.querySelectorAll('script');
                 let playerResponse = null;
+
+                const findInHtml = (html) => {
+                    const m = html.match(/ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var|meta|script|\n|$)/) ||
+                        html.match(/ytInitialPlayerResponse\s*=\s*({.+?})\s*$/m);
+                    if (m) {
+                        try { return JSON.parse(m[1]); } catch (e) { }
+                    }
+                    return null;
+                };
+
+                // 1. Check current DOM scripts
+                const scripts = document.querySelectorAll('script');
                 for (const s of scripts) {
                     if (s.textContent.includes('ytInitialPlayerResponse')) {
-                        const m = s.textContent.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
-                        if (m) playerResponse = JSON.parse(m[1]);
+                        playerResponse = findInHtml(s.textContent);
+                        if (playerResponse) break;
                     }
                 }
-                if (!playerResponse) throw new Error('无法解析播放器数据');
+
+                // 2. SPA Fallback: If navigating, playerResponse in DOM might be stale. Fetch fresh.
+                if (!playerResponse || (playerResponse.videoDetails?.videoId !== new URLSearchParams(window.location.search).get('v'))) {
+                    const html = await (await fetch(location.href)).text();
+                    playerResponse = findInHtml(html);
+                }
+
+                if (!playerResponse) throw new Error('无法解析 YouTube 播放器数据');
+
                 const captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-                if (!captions) throw new Error('视频无字幕');
-                const track = captions.find(t => t.languageCode.startsWith('zh')) || captions[0];
+                if (!captions || !captions.length) throw new Error('该视频无字幕轨道');
+
+                const track = captions.find(t => t.languageCode.startsWith('zh')) ||
+                    captions.find(t => t.languageCode.startsWith('en')) ||
+                    captions[0];
+
                 const subJson = await (await fetch(track.baseUrl + '&fmt=json3')).json();
-                textMarkup = subJson.events.filter(e => e.segs).map(e => e.segs.map(s => s.utf8).join('')).join('\n');
+                textMarkup = (subJson.events || [])
+                    .filter(e => e.segs)
+                    .map(e => e.segs.map(s => s.utf8).join(''))
+                    .join('\n');
+
             } else {
+                // Bilibili Logic
                 const pathSearchs = {};
                 location.search.slice(1).replace(/([^=&]*)=([^=&]*)/g, (_, a, b) => pathSearchs[a] = b);
                 let id = pathSearchs.bvid || location.pathname.split('/').find(p => p.startsWith('BV'));
