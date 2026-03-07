@@ -124,11 +124,13 @@
         container.id = 'bili-suite-container';
         container.innerHTML = `
       <div id="bs-toast"></div>
-      <button class="bs-fab-btn bs-sub-btn" title="提取视频字幕">
+      <button class="bs-fab-btn bs-sub-btn" title="一键复制字幕并发送给 Gemini">
         <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6v-2zm0 4h8v2H6v-2zm10 0h2v2h-2v-2zm-6-4h8v2h-8v-2z" fill="currentColor"/></svg>
+        <span>字幕 ➜ Gemini</span>
       </button>
-      <button class="bs-fab-btn bs-comm-btn" title="提取精华评论" style="${PLATFORM !== 'bilibili' ? 'display:none' : ''}">
-        <svg viewBox="0 0 24 24"><path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 2 22 2.9 22 4V16C22 17.1 21.1 18 20 18H6.83L4 20.83V4H20V2Z" fill="currentColor"/><path d="M12 11H8V9H12V11ZM16 11H14V9H16V11Z" fill="#fff"/></svg>
+      <button class="bs-fab-btn bs-comm-btn" title="一键提取精华评论并发送给 Gemini" style="${PLATFORM !== 'bilibili' ? 'display:none' : ''}">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" fill="currentColor"/></svg>
+        <span>热评 ➜ Gemini</span>
       </button>
     `;
         document.body.appendChild(container);
