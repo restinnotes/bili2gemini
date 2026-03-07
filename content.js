@@ -192,47 +192,8 @@
         try {
             let textMarkup = '';
             if (PLATFORM === 'youtube') {
-                let playerResponse = null;
-
-                const findInHtml = (html) => {
-                    const m = html.match(/ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var|meta|script|\n|$)/) ||
-                        html.match(/ytInitialPlayerResponse\s*=\s*({.+?})\s*$/m);
-                    if (m) {
-                        try { return JSON.parse(m[1]); } catch (e) { }
-                    }
-                    return null;
-                };
-
-                // 1. Check current DOM scripts
-                const scripts = document.querySelectorAll('script');
-                for (const s of scripts) {
-                    if (s.textContent.includes('ytInitialPlayerResponse')) {
-                        playerResponse = findInHtml(s.textContent);
-                        if (playerResponse) break;
-                    }
-                }
-
-                // 2. SPA Fallback: If navigating, playerResponse in DOM might be stale. Fetch fresh.
-                if (!playerResponse || (playerResponse.videoDetails?.videoId !== new URLSearchParams(window.location.search).get('v'))) {
-                    const html = await (await fetch(location.href)).text();
-                    playerResponse = findInHtml(html);
-                }
-
-                if (!playerResponse) throw new Error('无法解析 YouTube 播放器数据');
-
-                const captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-                if (!captions || !captions.length) throw new Error('该视频无字幕轨道');
-
-                const track = captions.find(t => t.languageCode.startsWith('zh')) ||
-                    captions.find(t => t.languageCode.startsWith('en')) ||
-                    captions[0];
-
-                const subJson = await (await fetch(track.baseUrl + '&fmt=json3')).json();
-                textMarkup = (subJson.events || [])
-                    .filter(e => e.segs)
-                    .map(e => e.segs.map(s => s.utf8).join(''))
-                    .join('\n');
-
+                // 对于 YouTube，直接使用链接，Gemini 官方插件会自动处理视频内容
+                textMarkup = window.location.href;
             } else {
                 // Bilibili Logic
                 const pathSearchs = {};
