@@ -226,7 +226,7 @@
             let collectedCount = 0;
             let cursor = 0;
 
-            for (let p = 1; p <= 40; p++) {
+            for (let p = 1; p <= 20; p++) {
                 const json = await safeFetch(`https://api.bilibili.com/x/v2/reply/main?next=${cursor}&type=1&oid=${aid}&mode=3`);
                 const replies = json.data?.replies || [];
                 if (!replies.length) break;
@@ -245,20 +245,20 @@
                 });
 
                 cursor = json.data?.cursor?.next;
-                showToast(`正在抓取评论: ${Math.min(Math.floor(collectedCount / 10), 99)}%`);
-                if (!cursor || collectedCount >= 1000) break;
-                await new Promise(r => setTimeout(r, 600));
+                showToast(`正在抓取评论: ${Math.min(Math.floor(collectedCount / 5), 99)}%`);
+                if (!cursor || collectedCount >= 500) break;
+                await new Promise(r => setTimeout(r, 1500));
             }
 
             results.sort((a, b) => b.like - a.like);
             let doc = `Bilibili 评论提取 (约 ${results.length} 组)\n\n`;
             let finalCount = 0;
             for (const c of results) {
-                if (finalCount >= 1000) break;
+                if (finalCount >= 550) break;
                 doc += `[${c.like}赞] ${c.uname}: ${c.msg}\n`;
                 finalCount++;
                 c.sub.forEach(s => {
-                    if (finalCount < 1000) {
+                    if (finalCount < 550) {
                         doc += `   └─ [${s.like}赞] ${s.uname}${s.to ? ' 回复 ' + s.to : ''}: ${s.msg}\n`;
                         finalCount++;
                     }
