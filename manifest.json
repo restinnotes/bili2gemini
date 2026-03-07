@@ -10,7 +10,10 @@
         "clipboardRead"
     ],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "scripts": [
+            "background.js"
+        ]
     },
     "options_ui": {
         "page": "options.html",
@@ -34,18 +37,14 @@
         }
     ],
     "icons": {
+        "16": "icons/icon16.png",
         "48": "icons/icon48.png",
         "128": "icons/icon128.png"
     },
     "browser_specific_settings": {
         "gecko": {
-            "id": "bili-q-tldr-pro@zuoyi.custom",
-            "strict_min_version": "109.0",
-            "data_collection_permissions": {
-                "required": [
-                    "none"
-                ]
-            }
+            "id": "bili2gemini@zuoyi.custom",
+            "strict_min_version": "109.0"
         }
     }
 }
